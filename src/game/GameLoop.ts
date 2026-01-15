@@ -6,6 +6,7 @@ export class GameLoop {
   private frameTime: number;
   private updateCallback: (deltaTime: number) => void;
   private renderCallback: () => void;
+  private timeoutId: NodeJS.Timeout | null;
 
   constructor(targetFPS: number = 60) {
     this.isRunning = false;
@@ -15,6 +16,7 @@ export class GameLoop {
     this.frameTime = 1000 / targetFPS;
     this.updateCallback = () => {};
     this.renderCallback = () => {};
+    this.timeoutId = null;
   }
 
   setUpdateCallback(callback: (deltaTime: number) => void): void {
@@ -37,10 +39,18 @@ export class GameLoop {
 
   stop(): void {
     this.isRunning = false;
+    if (this.timeoutId !== null) {
+      clearTimeout(this.timeoutId);
+      this.timeoutId = null;
+    }
   }
 
   pause(): void {
     this.isRunning = false;
+    if (this.timeoutId !== null) {
+      clearTimeout(this.timeoutId);
+      this.timeoutId = null;
+    }
   }
 
   resume(): void {
@@ -84,6 +94,6 @@ export class GameLoop {
 
     this.renderCallback();
 
-    requestAnimationFrame(() => this.loop());
+    this.timeoutId = setTimeout(() => this.loop(), 0);
   }
 }
