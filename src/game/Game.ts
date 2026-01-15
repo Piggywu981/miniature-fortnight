@@ -112,7 +112,7 @@ export class Game {
 
     switch (this.state) {
       case GameState.PLAYING:
-        this.updateGamePlay(deltaTime);
+        this.updateGamePlay();
         break;
       case GameState.COMBAT:
         this.updateCombat(deltaTime);
@@ -124,8 +124,8 @@ export class Game {
     }
   }
 
-  private updateGamePlay(deltaTime: number): void {
-    this.player.update(deltaTime);
+  private updateGamePlay(): void {
+    this.player.update();
     this.checkForCombat();
   }
 
