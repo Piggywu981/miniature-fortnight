@@ -34,9 +34,13 @@ describe('DamageCalculator', () => {
     });
 
     it('should calculate critical damage', () => {
+      jest.spyOn(Math, 'random').mockReturnValue(0.5);
+      
       const normalDamage = calculator.calculateDamage(mockAttacker, mockDefender, false);
       const criticalDamage = calculator.calculateDamage(mockAttacker, mockDefender, true);
       expect(criticalDamage).toBeGreaterThan(normalDamage);
+      
+      jest.restoreAllMocks();
     });
 
     it('should apply damage variance', () => {
