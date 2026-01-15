@@ -1,5 +1,6 @@
 import { Scene } from 'phaser';
 import { CharacterConfig } from '../characters/CharacterConfig.js';
+import { AudioGenerator } from '../assets/AudioGenerator.js';
 
 export class MenuScene extends Scene {
     constructor() {
@@ -8,34 +9,44 @@ export class MenuScene extends Scene {
     }
 
     create() {
-        // 设置背景色
-        this.cameras.main.setBackgroundColor('#1a1a2e');
+        this.audio = new AudioGenerator();
+        this.audio.init().then(() => {
+            this.audio.playMenuBGM();
+        });
+
+        this.cameras.main.setBackgroundColor('#0a0a15');
         
-        // 游戏标题
-        const title = this.add.text(this.game.config.width / 2, 100, '地牢肉鸽', {
+        this.createStarfieldBackground();
+        
+        const title = this.add.text(this.game.config.width / 2, 80, '地牢肉鸽', {
             fontSize: '48px',
-            fontFamily: 'Arial',
+            fontFamily: '"Press Start 2P", monospace',
             color: '#00ff00',
             stroke: '#000',
-            strokeThickness: 4
+            strokeThickness: 6,
+            shadow: { offsetX: 2, offsetY: 2, blur: 0, color: '#00ff00', fill: true }
         });
         title.setOrigin(0.5);
         
-        // 副标题
-        const subtitle = this.add.text(this.game.config.width / 2, 160, '选择你的角色，征服地牢！', {
-            fontSize: '20px',
-            fontFamily: 'Arial',
+        this.tweens.add({
+            targets: title,
+            alpha: 0.7,
+            duration: 500,
+            yoyo: true,
+            repeat: -1
+        });
+        
+        const subtitle = this.add.text(this.game.config.width / 2, 150, '选择你的角色，征服地牢！', {
+            fontSize: '14px',
+            fontFamily: '"Press Start 2P", monospace',
             color: '#ffffff'
         });
         subtitle.setOrigin(0.5);
         
-        // 角色选择区域
         this.createCharacterSelection();
         
-        // 开始游戏按钮
         this.createStartButton();
         
-        // 操作说明
         this.createInstructions();
     }
 
@@ -57,62 +68,71 @@ export class MenuScene extends Scene {
             const y = startY + index * spacing;
             const config = CharacterConfig[char.id];
             
-            // 角色按钮背景
+            const preview = this.add.rectangle(
+                this.game.config.width / 2 - 190,
+                y,
+                32, 32,
+                this.getCharacterColor(char.id)
+            );
+            preview.alpha = this.selectedCharacter === char.id ? 1 : 0.5;
+            
             const buttonBg = this.add.rectangle(
-                this.game.config.width / 2, y, 400, 50,
-                this.selectedCharacter === char.id ? 0x00ff00 : 0x333333
+                this.game.config.width / 2, y, 450, 60,
+                this.selectedCharacter === char.id ? 0x003300 : 0x222222
             );
             buttonBg.setInteractive();
             buttonBg.setStrokeStyle(2, 0x666666);
             
-            // 角色信息
             const nameText = this.add.text(
-                this.game.config.width / 2 - 180, y,
+                this.game.config.width / 2 - 160, y - 5,
                 `${char.name} (${char.class})`,
                 {
-                    fontSize: '16px',
-                    fontFamily: 'Arial',
-                    color: this.selectedCharacter === char.id ? '#000' : '#fff'
+                    fontSize: '14px',
+                    fontFamily: '"Press Start 2P", monospace',
+                    color: this.selectedCharacter === char.id ? '#00ff00' : '#ffffff'
                 }
             );
             nameText.setOrigin(0, 0.5);
             
             const statsText = this.add.text(
-                this.game.config.width / 2 - 180, y + 12,
-                `HP: ${config.stats.health} | 盾: ${config.stats.shield}`,
+                this.game.config.width / 2 - 160, y + 15,
+                `HP:${config.stats.health} SH:${config.stats.shield}`,
                 {
-                    fontSize: '12px',
-                    fontFamily: 'Arial',
-                    color: this.selectedCharacter === char.id ? '#000' : '#aaa'
+                    fontSize: '10px',
+                    fontFamily: '"Press Start 2P", monospace',
+                    color: this.selectedCharacter === char.id ? '#00ff00' : '#aaaaaa'
                 }
             );
-            nameText.setOrigin(0, 0.5);
+            statsText.setOrigin(0, 0.5);
             
             const descText = this.add.text(
                 this.game.config.width / 2 + 180, y,
                 char.desc,
                 {
-                    fontSize: '12px',
-                    fontFamily: 'Arial',
-                    color: this.selectedCharacter === char.id ? '#000' : '#aaa'
+                    fontSize: '10px',
+                    fontFamily: '"Press Start 2P", monospace',
+                    color: this.selectedCharacter === char.id ? '#00ff00' : '#aaaaaa'
                 }
             );
             descText.setOrigin(1, 0.5);
             
-            // 点击事件
             buttonBg.on('pointerover', () => {
+                if (this.audio) this.audio.uiClick();
                 if (this.selectedCharacter !== char.id) {
-                    buttonBg.setFillStyle(0x444444);
+                    buttonBg.setFillStyle(0x333333);
+                    preview.alpha = 0.8;
                 }
             });
             
             buttonBg.on('pointerout', () => {
                 if (this.selectedCharacter !== char.id) {
-                    buttonBg.setFillStyle(0x333333);
+                    buttonBg.setFillStyle(0x222222);
+                    preview.alpha = 0.5;
                 }
             });
             
             buttonBg.on('pointerdown', () => {
+                if (this.audio) this.audio.uiClick();
                 this.selectCharacter(char.id, characters);
             });
             
@@ -121,68 +141,87 @@ export class MenuScene extends Scene {
                 name: nameText,
                 stats: statsText,
                 desc: descText,
+                preview: preview,
                 id: char.id
             });
         });
     }
 
     selectCharacter(characterId, characters) {
-        // 重置所有按钮样式
         characters.forEach((char, index) => {
             const button = this.characterButtons[index];
-            button.bg.setFillStyle(0x333333);
-            button.name.setColor('#fff');
-            button.stats.setColor('#aaa');
-            button.desc.setColor('#aaa');
+            button.bg.setFillStyle(0x222222);
+            button.name.setColor('#ffffff');
+            button.stats.setColor('#aaaaaa');
+            button.desc.setColor('#aaaaaa');
+            button.preview.alpha = 0.5;
         });
         
-        // 高亮选中的按钮
         const selectedIndex = characters.findIndex(c => c.id === characterId);
         const selectedButton = this.characterButtons[selectedIndex];
-        selectedButton.bg.setFillStyle(0x00ff00);
-        selectedButton.name.setColor('#000');
-        selectedButton.stats.setColor('#000');
-        selectedButton.desc.setColor('#000');
+        selectedButton.bg.setFillStyle(0x003300);
+        selectedButton.name.setColor('#00ff00');
+        selectedButton.stats.setColor('#00ff00');
+        selectedButton.desc.setColor('#00ff00');
+        selectedButton.preview.alpha = 1;
         
         this.selectedCharacter = characterId;
     }
 
     createStartButton() {
-        // 开始按钮
         const startBtn = this.add.rectangle(
             this.game.config.width / 2,
             600,
-            200, 60,
+            200, 50,
             0x00aa00
         );
         startBtn.setInteractive();
-        startBtn.setStrokeStyle(3, 0x00ff00);
+        startBtn.setStrokeStyle(4, 0x00ff00);
         
         const startText = this.add.text(
             this.game.config.width / 2,
             600,
             '开始游戏',
             {
-                fontSize: '24px',
-                fontFamily: 'Arial',
-                color: '#fff',
+                fontSize: '16px',
+                fontFamily: '"Press Start 2P", monospace',
+                color: '#ffffff',
                 stroke: '#000',
-                strokeThickness: 2
+                strokeThickness: 3
             }
         );
         startText.setOrigin(0.5);
         
-        // 按钮交互
         startBtn.on('pointerover', () => {
+            if (this.audio) this.audio.uiClick();
             startBtn.setFillStyle(0x00cc00);
+            this.tweens.add({
+                targets: startBtn,
+                scale: 1.05,
+                duration: 100
+            });
         });
         
         startBtn.on('pointerout', () => {
             startBtn.setFillStyle(0x00aa00);
+            this.tweens.add({
+                targets: startBtn,
+                scale: 1,
+                duration: 100
+            });
         });
         
         startBtn.on('pointerdown', () => {
-            this.startGame();
+            if (this.audio) this.audio.uiClick();
+            this.tweens.add({
+                targets: startBtn,
+                scale: 0.95,
+                duration: 50,
+                yoyo: true,
+                onComplete: () => {
+                    this.startGame();
+                }
+            });
         });
     }
 
@@ -191,28 +230,60 @@ export class MenuScene extends Scene {
             '操作说明：',
             'WASD / 方向键 - 移动',
             '鼠标左键 - 射击',
-            '鼠标右键 - 使用角色特殊技能',
+            '鼠标右键 - 特殊技能',
             '目标：消灭敌人，生存下去！'
         ];
         
         instructions.forEach((text, index) => {
             this.add.text(
                 this.game.config.width / 2,
-                650 + index * 20,
+                660 + index * 20,
                 text,
                 {
-                    fontSize: '14px',
-                    fontFamily: 'Arial',
-                    color: '#aaa'
+                    fontSize: '10px',
+                    fontFamily: '"Press Start 2P", monospace',
+                    color: '#aaaaaa'
                 }
             ).setOrigin(0.5);
         });
     }
 
     startGame() {
-        // 传递选中的角色ID到游戏场景
+        if (this.audio) {
+            this.audio.stopBGM();
+        }
         this.scene.start('GameScene', { 
             characterId: this.selectedCharacter 
         });
+    }
+    
+    createStarfieldBackground() {
+        const starCount = 100;
+        for (let i = 0; i < starCount; i++) {
+            const x = Phaser.Math.Between(0, this.game.config.width);
+            const y = Phaser.Math.Between(0, this.game.config.height);
+            const size = Phaser.Math.Between(1, 3);
+            const star = this.add.rectangle(x, y, size, size, 0xffffff);
+            star.alpha = Phaser.Math.FloatBetween(0.3, 0.8);
+            
+            this.tweens.add({
+                targets: star,
+                alpha: 0.1,
+                duration: Phaser.Math.Between(1000, 3000),
+                yoyo: true,
+                repeat: -1
+            });
+        }
+    }
+    
+    getCharacterColor(characterId) {
+        const colors = {
+            'INA': 0x00ff00,
+            'MISHKA': 0xff8800,
+            'ANNA': 0x00ffff,
+            'MILAN': 0xff00ff,
+            'YUKO': 0xffff00
+        };
+        return colors[characterId] || 0x00ff00;
     }
 }

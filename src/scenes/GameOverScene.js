@@ -1,9 +1,11 @@
 import { Scene } from 'phaser';
+import { AudioGenerator } from '../assets/AudioGenerator.js';
 
 export class GameOverScene extends Scene {
     constructor() {
         super({ key: 'GameOverScene' });
         this.finalStats = null;
+        this.audio = null;
     }
 
     init(data) {
@@ -19,126 +21,100 @@ export class GameOverScene extends Scene {
     }
 
     create() {
-        // 设置背景色
-        this.cameras.main.setBackgroundColor('#1a0020');
+        this.audio = new AudioGenerator();
+        this.audio.init().then(() => {
+            this.audio.playGameOverBGM();
+        });
         
-        // 游戏结束标题
+        this.cameras.main.setBackgroundColor('#0f0010');
+        
         const gameOverText = this.add.text(
-            this.game.config.width / 2,
-            150,
-            '游戏结束',
+            this.game.config.width / 2, 120,
+            'GAME OVER',
             {
                 fontSize: '64px',
-                fontFamily: 'Arial',
+                fontFamily: '"Press Start 2P", monospace',
                 color: '#ff0000',
                 stroke: '#000',
-                strokeThickness: 6
+                strokeThickness: 8,
+                shadow: { offsetX: 4, offsetY: 4, blur: 0, color: '#ff0000', fill: true }
             }
         );
         gameOverText.setOrigin(0.5);
         
-        // 添加动画效果
         this.tweens.add({
             targets: gameOverText,
-            scaleX: 1.1,
-            scaleY: 1.1,
-            duration: 1000,
+            x: this.game.config.width / 2 + 2,
+            duration: 50,
             yoyo: true,
-            repeat: -1
+            repeat: 20
         });
         
-        // 显示角色信息
         const characterText = this.add.text(
             this.game.config.width / 2,
-            250,
+            200,
             `角色: ${this.finalStats.characterName}`,
             {
-                fontSize: '24px',
-                fontFamily: 'Arial',
+                fontSize: '12px',
+                fontFamily: '"Press Start 2P", monospace',
                 color: '#ffffff'
             }
         );
         characterText.setOrigin(0.5);
         
-        // 显示死亡原因
         const reasonText = this.add.text(
             this.game.config.width / 2,
-            300,
+            230,
             this.finalStats.reason || '你倒在了地牢中...',
             {
-                fontSize: '20px',
-                fontFamily: 'Arial',
-                color: '#ffaaaa',
-                stroke: '#000',
-                strokeThickness: 2
+                fontSize: '10px',
+                fontFamily: '"Press Start 2P", monospace',
+                color: '#ffaaaa'
             }
         );
         reasonText.setOrigin(0.5);
         
-        // 统计信息面板
         this.createStatsPanel();
         
-        // 创建按钮
+        this.createRatingDisplay();
+        
         this.createButtons();
         
-        // 添加背景粒子效果（可选）
         this.createParticleEffect();
     }
 
     createStatsPanel() {
-        const panelY = 380;
+        const panelX = this.game.config.width / 2;
+        const panelY = 330;
         
-        // 面板背景
-        const panelBg = this.add.rectangle(
-            this.game.config.width / 2,
-            panelY,
-            400, 150,
-            0x000000,
-            0.5
-        );
-        panelBg.setStrokeStyle(2, 0x666666);
+        const panelBg = this.add.rectangle(panelX, panelY, 450, 160, 0x000000);
+        panelBg.setStrokeStyle(4, 0x666666);
         
-        // 击杀数
-        const killText = this.add.text(
-            this.game.config.width / 2 - 150,
-            panelY - 40,
-            `击杀敌人: ${this.finalStats.killCount}`,
-            {
-                fontSize: '20px',
-                fontFamily: 'Arial',
-                color: '#00ff00'
-            }
-        );
-        killText.setOrigin(0, 0.5);
+        this.add.text(panelX - 200, panelY - 50, `角色: ${this.finalStats.characterName}`, {
+            fontSize: '10px',
+            fontFamily: '"Press Start 2P", monospace',
+            color: '#ffffff'
+        }).setOrigin(0, 0.5);
         
-        // 游戏时长
+        this.add.text(panelX - 200, panelY - 30, this.finalStats.reason || '你倒在了地牢中...', {
+            fontSize: '10px',
+            fontFamily: '"Press Start 2P", monospace',
+            color: '#ffaaaa'
+        }).setOrigin(0, 0.5);
+        
+        this.add.text(panelX - 200, panelY + 20, `击杀: ${this.finalStats.killCount}`, {
+            fontSize: '12px',
+            fontFamily: '"Press Start 2P", monospace',
+            color: '#00ff00'
+        }).setOrigin(0, 0.5);
+        
         const minutes = Math.floor(this.finalStats.gameTime / 60000);
         const seconds = Math.floor((this.finalStats.gameTime % 60000) / 1000);
-        const timeText = this.add.text(
-            this.game.config.width / 2 - 150,
-            panelY,
-            `生存时间: ${minutes}分${seconds}秒`,
-            {
-                fontSize: '20px',
-                fontFamily: 'Arial',
-                color: '#ffff00'
-            }
-        );
-        timeText.setOrigin(0, 0.5);
-        
-        // 评级系统
-        const rating = this.calculateRating();
-        const ratingText = this.add.text(
-            this.game.config.width / 2 - 150,
-            panelY + 40,
-            `评级: ${rating}`,
-            {
-                fontSize: '20px',
-                fontFamily: 'Arial',
-                color: this.getRatingColor(rating)
-            }
-        );
-        ratingText.setOrigin(0, 0.5);
+        this.add.text(panelX - 200, panelY + 50, `时间: ${minutes}:${seconds.toString().padStart(2, '0')}`, {
+            fontSize: '12px',
+            fontFamily: '"Press Start 2P", monospace',
+            color: '#ffff00'
+        }).setOrigin(0, 0.5);
     }
 
     calculateRating() {
@@ -165,76 +141,124 @@ export class GameOverScene extends Scene {
             default: return '#ff0000';
         }
     }
-
-    createButtons() {
-        // 重新开始按钮
-        const restartBtn = this.add.rectangle(
-            this.game.config.width / 2 - 150,
-            550,
-            180, 50,
-            0x00aa00
-        );
-        restartBtn.setInteractive();
-        restartBtn.setStrokeStyle(3, 0x00ff00);
+    
+    getStarCount(rating) {
+        switch(rating) {
+            case 'S': return 5;
+            case 'A': return 4;
+            case 'B': return 3;
+            case 'C': return 2;
+            case 'D': return 1;
+            default: return 0;
+        }
+    }
+    
+    createRatingDisplay() {
+        const rating = this.calculateRating();
+        const ratingX = this.game.config.width / 2;
+        const ratingY = 400;
         
-        const restartText = this.add.text(
-            this.game.config.width / 2 - 150,
-            550,
-            '重新开始',
-            {
-                fontSize: '20px',
-                fontFamily: 'Arial',
-                color: '#fff',
-                stroke: '#000',
-                strokeThickness: 2
-            }
-        );
-        restartText.setOrigin(0.5);
+        const ratingText = this.add.text(ratingX, ratingY, rating, {
+            fontSize: '80px',
+            fontFamily: '"Press Start 2P", monospace',
+            color: this.getRatingColor(rating),
+            stroke: '#000',
+            strokeThickness: 8
+        });
+        ratingText.setOrigin(0.5);
         
-        // 主菜单按钮
-        const menuBtn = this.add.rectangle(
-            this.game.config.width / 2 + 150,
-            550,
-            180, 50,
-            0xaa0000
-        );
-        menuBtn.setInteractive();
-        menuBtn.setStrokeStyle(3, 0xff0000);
-        
-        const menuText = this.add.text(
-            this.game.config.width / 2 + 150,
-            550,
-            '主菜单',
-            {
-                fontSize: '20px',
-                fontFamily: 'Arial',
-                color: '#fff',
-                stroke: '#000',
-                strokeThickness: 2
-            }
-        );
-        menuText.setOrigin(0.5);
-        
-        // 按钮交互
-        this.setupButton(restartBtn, restartText, 0x00cc00, 0x00aa00, () => {
-            this.restartGame();
+        this.tweens.add({
+            targets: ratingText,
+            scale: 1.1,
+            duration: 500,
+            yoyo: true,
+            repeat: -1
         });
         
-        this.setupButton(menuBtn, menuText, 0xcc0000, 0xaa0000, () => {
-            this.backToMenu();
-        });
+        const stars = this.getStarCount(rating);
+        for (let i = 0; i < stars; i++) {
+            const star = this.add.rectangle(
+                ratingX - 60 + i * 40,
+                ratingY + 50,
+                20, 20, 0xffff00
+            );
+        }
     }
 
-    setupButton(button, text, hoverColor, normalColor, callback) {
-        button.on('pointerover', () => {
-            button.setFillStyle(hoverColor);
+    createButtons() {
+        const buttonY = 530;
+        
+        this.createPixelButton(
+            this.game.config.width / 2 - 100,
+            buttonY,
+            180, 50,
+            '重新开始',
+            0x00aa00,
+            () => this.restartGame()
+        );
+        
+        this.createPixelButton(
+            this.game.config.width / 2 + 100,
+            buttonY,
+            180, 50,
+            '主菜单',
+            0xaa0000,
+            () => this.backToMenu()
+        );
+    }
+    
+    createPixelButton(x, y, width, height, text, color, callback) {
+        const container = this.add.container(x, y);
+        
+        const bg = this.add.rectangle(0, 0, width, height, color);
+        bg.setStrokeStyle(4, this.lightenColor(color, 50));
+        
+        const textObj = this.add.text(0, 0, text, {
+            fontSize: '14px',
+            fontFamily: '"Press Start 2P", monospace',
+            color: '#ffffff',
+            stroke: '#000',
+            strokeThickness: 3
+        });
+        textObj.setOrigin(0.5);
+        
+        container.add([bg, textObj]);
+        
+        bg.setInteractive();
+        
+        bg.on('pointerover', () => {
+            if (this.audio) this.audio.uiClick();
+            bg.setFillStyle(this.lightenColor(color, 30));
+            this.tweens.add({
+                targets: container,
+                scale: 1.05,
+                duration: 100
+            });
         });
         
-        button.on('pointerout', () => {
-            button.setFillStyle(normalColor);
+        bg.on('pointerout', () => {
+            bg.setFillStyle(color);
+            this.tweens.add({
+                targets: container,
+                scale: 1,
+                duration: 100
+            });
         });
         
-        button.on('pointerdown', callback);
+        bg.on('pointerdown', () => {
+            if (this.audio) this.audio.uiClick();
+            this.tweens.add({
+                targets: container,
+                scale: 0.95,
+                duration: 50,
+                yoyo: true,
+                onComplete: callback
+            });
+        });
+    }
+    
+    lightenColor(color, amount) {
+        return color + amount;
     }
 
     createParticleEffect() {

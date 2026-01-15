@@ -2,6 +2,9 @@ import { Scene } from 'phaser';
 import { CharacterConfig } from '../characters/CharacterConfig.js';
 import { Player } from '../characters/Player.js';
 import { EnemyManager } from '../enemies/EnemyManager.js';
+import { SpriteGenerator } from '../assets/SpriteGenerator.js';
+import { PixelParticleSystem } from '../effects/PixelParticleSystem.js';
+import { AudioGenerator } from '../assets/AudioGenerator.js';
 
 export class GameScene extends Scene {
     constructor() {
@@ -15,6 +18,9 @@ export class GameScene extends Scene {
         this.items = null;
         this.killCount = 0;
         this.gameTime = 0;
+        this.audio = null;
+        this.particles = null;
+        this.spriteGenerator = null;
     }
 
     preload() {
@@ -22,29 +28,33 @@ export class GameScene extends Scene {
     }
 
     create(data) {
-        // 获取从菜单传递过来的角色ID，默认为伊娜
         const characterId = data && data.characterId ? data.characterId : 'INA';
         
-        // 在 create 阶段开始时创建所有纹理
+        this.audio = new AudioGenerator();
+        this.audio.init().then(() => {
+            this.audio.playGameBGM();
+        });
+        
+        this.spriteGenerator = new SpriteGenerator(this);
+        this.spriteGenerator.generateAllSprites();
+        
+        this.particles = new PixelParticleSystem(this);
+        
         this.createPlaceholderGraphics();
         
-        // 初始化输入
         this.initializeInput();
         
-        // 创建地图
         this.createMap();
         
-        // 创建玩家（使用选中的角色）
         this.createPlayer(characterId);
         
-        // 创建游戏对象组
         this.createGroups();
         
-        // 创建敌人管理器
         this.enemyManager = new EnemyManager(this);
         
-        // 创建UI
         this.createUI();
+        
+        this.createPlayerAnimations(characterId);
     }
 
     update(time, delta) {
@@ -91,58 +101,81 @@ export class GameScene extends Scene {
     }
 
     createMap() {
-        // 创建简单的游戏世界边界
         const wallThickness = 20;
         const worldWidth = 1200;
         const worldHeight = 900;
         
-        // 创建地面背景
         const ground = this.add.rectangle(
             worldWidth / 2, 
             worldHeight / 2, 
             worldWidth, 
             worldHeight, 
-            0x333333
+            0x1a1a2e
         );
-        ground.setDepth(-1); // 设置在最底层
+        ground.setDepth(-1);
         
-        // 创建墙壁组
+        this.createPixelGrid(worldWidth, worldHeight);
+        
         this.walls = this.physics.add.staticGroup();
         
-        // 上墙
         this.walls.create(worldWidth / 2, wallThickness / 2, 'wall-tile')
             .setDisplaySize(worldWidth, wallThickness).refreshBody();
         
-        // 下墙
         this.walls.create(worldWidth / 2, worldHeight - wallThickness / 2, 'wall-tile')
             .setDisplaySize(worldWidth, wallThickness).refreshBody();
         
-        // 左墙
         this.walls.create(wallThickness / 2, worldHeight / 2, 'wall-tile')
             .setDisplaySize(wallThickness, worldHeight).refreshBody();
         
-        // 右墙
         this.walls.create(worldWidth - wallThickness / 2, worldHeight / 2, 'wall-tile')
             .setDisplaySize(wallThickness, worldHeight).refreshBody();
         
-        // 设置世界边界
         this.physics.world.setBounds(0, 0, worldWidth, worldHeight);
         this.cameras.main.setBounds(0, 0, worldWidth, worldHeight);
+    }
+    
+    createPixelGrid(width, height) {
+        const gridSize = 32;
+        for (let x = 0; x < width; x += gridSize) {
+            this.add.rectangle(x, height/2, 1, height, 0x222222, 0.3);
+        }
+        for (let y = 0; y < height; y += gridSize) {
+            this.add.rectangle(width/2, y, width, 1, 0x222222, 0.3);
+        }
     }
 
     createPlayer(characterId) {
         const config = CharacterConfig[characterId];
         
-        // 在config中添加characterId
         config.characterId = characterId;
         
         const startX = this.game.config.width / 2;
         const startY = this.game.config.height / 2;
         
         this.player = new Player(this, startX, startY, config);
+        this.player.setTexture(`player-${characterId}-down-0`);
         
-        // 相机跟随
         this.cameras.main.startFollow(this.player);
+    }
+    
+    createPlayerAnimations(characterId) {
+        const directions = ['down', 'left', 'right', 'up'];
+        
+        directions.forEach(dir => {
+            const frames = [
+                { key: `player-${characterId}-${dir}-0` },
+                { key: `player-${characterId}-${dir}-1` },
+                { key: `player-${characterId}-${dir}-2` },
+                { key: `player-${characterId}-${dir}-1` }
+            ];
+            
+            this.anims.create({
+                key: `walk-${characterId}-${dir}`,
+                frames: frames,
+                frameRate: 8,
+                repeat: -1
+            });
+        });
     }
 
     createGroups() {
@@ -158,51 +191,57 @@ export class GameScene extends Scene {
     }
 
     createUI() {
-        // 创建UI容器
         this.uiContainer = this.add.container(0, 0);
         this.uiContainer.setScrollFactor(0);
         
-        // 血条
-        this.healthBar = this.createHealthBar();
-        this.shieldBar = this.createShieldBar();
+        this.healthBar = this.createSegmentedBar(20, 20, 'HP', 0xff0000);
+        this.shieldBar = this.createSegmentedBar(20, 50, 'SH', 0x00ffff);
+        
+        this.killCounter = this.add.text(20, 90, 'KILLS: 0', {
+            fontSize: '10px',
+            fontFamily: '"Press Start 2P", monospace',
+            color: '#ffff00',
+            stroke: '#000',
+            strokeThickness: 2
+        });
+        
+        this.waveDisplay = this.add.text(20, 110, 'WAVE: 1', {
+            fontSize: '10px',
+            fontFamily: '"Press Start 2P", monospace',
+            color: '#00ffff',
+            stroke: '#000',
+            strokeThickness: 2
+        });
         
         this.uiContainer.add([this.healthBar.container, this.shieldBar.container]);
     }
 
-    createHealthBar() {
-        const container = this.add.container(20, 20);
+    createSegmentedBar(x, y, label, color) {
+        const container = this.add.container(x, y);
         
-        const bg = this.add.rectangle(0, 0, 200, 20, 0x000000);
-        const bar = this.add.rectangle(-100, 0, 200, 20, 0xff0000);
-        bar.setOrigin(0, 0.5);
-        const text = this.add.text(0, -25, 'HP: 0/0', { 
-            fontSize: '14px', 
-            fill: '#fff',
-            stroke: '#000',
-            strokeThickness: 2
+        const border = this.add.rectangle(100, 0, 200, 24, 0x000000);
+        border.setStrokeStyle(2, color);
+        
+        const segments = [];
+        for (let i = 0; i < 10; i++) {
+            const segment = this.add.rectangle(
+                -90 + i * 20, 0,
+                18, 18, color
+            );
+            segment.alpha = 1;
+            segments.push(segment);
+        }
+        
+        const labelText = this.add.text(-110, 0, label, {
+            fontSize: '10px',
+            fontFamily: '"Press Start 2P", monospace',
+            color: '#ffffff'
         });
+        labelText.setOrigin(0, 0.5);
         
-        container.add([bg, bar, text]);
+        container.add([border, labelText, ...segments]);
         
-        return { container, bar, text };
-    }
-
-    createShieldBar() {
-        const container = this.add.container(20, 50);
-        
-        const bg = this.add.rectangle(0, 0, 200, 20, 0x000000);
-        const bar = this.add.rectangle(-100, 0, 200, 20, 0x00ffff);
-        bar.setOrigin(0, 0.5);
-        const text = this.add.text(0, -25, 'Shield: 0/0', { 
-            fontSize: '14px', 
-            fill: '#fff',
-            stroke: '#000',
-            strokeThickness: 2
-        });
-        
-        container.add([bg, bar, text]);
-        
-        return { container, bar, text };
+        return { container, segments };
     }
 
     updateCollisions() {
@@ -253,15 +292,22 @@ export class GameScene extends Scene {
     updateUI(time, delta) {
         if (!this.player || !this.player.active) return;
         
-        // 更新血条
         const healthPercent = this.player.currentHealth / this.player.maxHealth;
-        this.healthBar.bar.width = 200 * healthPercent;
-        this.healthBar.text.setText(`HP: ${this.player.currentHealth}/${this.player.maxHealth}`);
+        const filledSegments = Math.ceil(healthPercent * 10);
         
-        // 更新护盾条
+        this.healthBar.segments.forEach((segment, index) => {
+            segment.alpha = index < filledSegments ? 1 : 0.3;
+        });
+        
         const shieldPercent = this.player.currentShield / this.player.maxShield;
-        this.shieldBar.bar.width = 200 * shieldPercent;
-        this.shieldBar.text.setText(`Shield: ${this.player.currentShield}/${this.player.maxShield}`);
+        const filledShieldSegments = Math.ceil(shieldPercent * 10);
+        
+        this.shieldBar.segments.forEach((segment, index) => {
+            segment.alpha = index < filledShieldSegments ? 1 : 0.3;
+        });
+        
+        this.killCounter.setText(`KILLS: ${this.player.killCount}`);
+        this.waveDisplay.setText(`WAVE: ${this.enemyManager.currentWave}`);
     }
 
     createPlaceholderGraphics() {
@@ -361,74 +407,32 @@ export class GameScene extends Scene {
     }
 
     handleEnemyDeath(enemy, awardScore = true) {
-        // 只有在敌人仍有活跃状态时处理
         if (!enemy || enemy.health > 0) return;
         
-        // 获取敌人得分和颜色
         const score = enemy.score || 10;
         const color = enemy.color || 0xff00ff;
         
-        // 处理击杀
+        this.particles.createExplosion(enemy.x, enemy.y, color, 16, 8);
+        this.particles.createScorePopup(enemy.x, enemy.y, score);
+        
+        if (this.audio) {
+            this.audio.enemyDeath();
+        }
+        
         let killCountWasIncremented = false;
         if (this.player && this.player.killCountManager) {
             this.player.killCountManager.incrementKillCount();
             this.killCount = this.player.killCountManager.killCount;
             killCountWasIncremented = true;
         } else {
-            // 后备方案
             this.killCount++;
             killCountWasIncremented = true;
         }
         
-        // 更新敌人管理器统计（如果存在）
         if (this.enemyManager) {
             this.enemyManager.totalEnemiesKilled++;
         }
         
-        // 销毁敌人
         enemy.destroy();
-        
-        // TODO: 添加击杀特效和音效
-        this.createKillEffect(enemy.x, enemy.y, score, color);
-    }
-
-    /**
-     * 创建击杀特效
-     */
-    createKillEffect(x, y, score, color = 0xff00ff) {
-        // 得分文字
-        const text = this.add.text(x, y, `+${score}`, {
-            fontSize: '16px',
-            fill: '#ffff00',
-            stroke: '#000',
-            strokeThickness: 2
-        });
-        text.setOrigin(0.5);
-        
-        this.tweens.add({
-            targets: text,
-            y: y - 30,
-            alpha: 0,
-            duration: 800,
-            onComplete: () => {
-                if (text && !text.destroyed) {
-                    text.destroy();
-                }
-            }
-        });
-        
-        // 爆炸效果
-        const effect = this.add.circle(x, y, 10, color, 0.5);
-        this.tweens.add({
-            targets: effect,
-            scale: 2,
-            alpha: 0,
-            duration: 300,
-            onComplete: () => {
-                if (effect && !effect.destroyed) {
-                    effect.destroy();
-                }
-            }
-        });
     }
 }
