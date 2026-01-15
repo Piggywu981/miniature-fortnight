@@ -166,27 +166,27 @@ export class Game {
   }
 
   private renderGamePlay(): void {
-    console.log('Rendering game play...');
+    // Rendering is handled by the web client
   }
 
   private renderCombat(): void {
-    console.log('Rendering combat...');
+    // Rendering is handled by the web client
   }
 
   private renderPaused(): void {
-    console.log('Rendering paused...');
+    // Rendering is handled by the web client
   }
 
   private renderMenu(): void {
-    console.log('Rendering menu...');
+    // Rendering is handled by the web client
   }
 
   private renderGameOver(): void {
-    console.log('Rendering game over...');
+    // Rendering is handled by the web client
   }
 
   private renderVictory(): void {
-    console.log('Rendering victory...');
+    // Rendering is handled by the web client
   }
 
   private generateMap(): void {

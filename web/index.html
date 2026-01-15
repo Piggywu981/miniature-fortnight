@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Miniature Fortnight - Roguelike Game</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="game-container">
+        <header class="game-header">
+            <h1>Miniature Fortnight</h1>
+            <div class="game-stats">
+                <div class="stat">
+                    <span class="label">Level:</span>
+                    <span id="level">1</span>
+                </div>
+                <div class="stat">
+                    <span class="label">Health:</span>
+                    <span id="health">100/100</span>
+                </div>
+                <div class="stat">
+                    <span class="label">XP:</span>
+                    <span id="experience">0</span>
+                </div>
+                <div class="stat">
+                    <span class="label">Position:</span>
+                    <span id="position">0, 0</span>
+                </div>
+            </div>
+        </header>
+
+        <main class="game-main">
+            <div class="game-map-container">
+                <h3>Dungeon Map</h3>
+                <canvas id="game-canvas" width="800" height="600"></canvas>
+            </div>
+
+            <aside class="game-sidebar">
+                <div class="controls">
+                    <h3>Controls</h3>
+                    <div class="movement-controls">
+                        <button id="btn-up" class="control-btn">↑</button>
+                        <button id="btn-left" class="control-btn">←</button>
+                        <button id="btn-wait" class="control-btn">Wait</button>
+                        <button id="btn-right" class="control-btn">→</button>
+                        <button id="btn-down" class="control-btn">↓</button>
+                    </div>
+                    <div class="action-controls">
+                        <button id="btn-pause" class="control-btn">Pause</button>
+                        <button id="btn-resume" class="control-btn">Resume</button>
+                    </div>
+                </div>
+
+                <div class="stats-panel">
+                    <h3>Statistics</h3>
+                    <div class="stat-item">
+                        <span>Play Time:</span>
+                        <span id="playTime">0s</span>
+                    </div>
+                    <div class="stat-item">
+                        <span>Rooms Explored:</span>
+                        <span id="roomsExplored">0</span>
+                    </div>
+                    <div class="stat-item">
+                        <span>Enemies Defeated:</span>
+                        <span id="enemiesDefeated">0</span>
+                    </div>
+                    <div class="stat-item">
+                        <span>Items Collected:</span>
+                        <span id="itemsCollected">0</span>
+                    </div>
+                </div>
+
+                <div class="log-panel">
+                    <h3>Game Log</h3>
+                    <div id="game-log" class="log-content"></div>
+                </div>
+            </aside>
+        </main>
+
+        <footer class="game-footer">
+            <p>Press arrow keys or use buttons to move. Explore the dungeon!</p>
+        </footer>
+    </div>
+
+    <script src="game.js"></script>
+</body>
+</html>
