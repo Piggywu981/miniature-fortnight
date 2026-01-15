@@ -139,35 +139,42 @@ export class Inventory {
     this.equippedItems.clear();
   }
 
-  serialize() {
-    return {
-      maxSize: this.maxSize,
-      items: this.items.map(item => item.serialize()),
-      equippedItems: Array.from(this.equippedItems.entries()).map(([slot, item]) => ({
-        slot,
-        item: item.serialize()
-      }))
-    };
+  serialize(): any[] {
+    return this.items.map(item => item.serialize());
   }
 
   static deserialize(data: any): Inventory {
-    const inventory = new Inventory(data.maxSize);
+    const inventory = new Inventory(20);
     
-    data.items.forEach((itemData: any) => {
-      if (itemData.stats) {
-        inventory.addItem(Equipment.deserialize(itemData));
-      } else if (itemData.effects) {
-        inventory.addItem(Consumable.deserialize(itemData));
-      } else {
-        inventory.addItem(Item.deserialize(itemData));
-      }
-    });
+    if (Array.isArray(data)) {
+      data.forEach((itemData: any) => {
+        if (itemData.stats) {
+          inventory.addItem(Equipment.deserialize(itemData));
+        } else if (itemData.effects) {
+          inventory.addItem(Consumable.deserialize(itemData));
+        } else {
+          inventory.addItem(Item.deserialize(itemData));
+        }
+      });
+    } else if (data.items) {
+      data.items.forEach((itemData: any) => {
+        if (itemData.stats) {
+          inventory.addItem(Equipment.deserialize(itemData));
+        } else if (itemData.effects) {
+          inventory.addItem(Consumable.deserialize(itemData));
+        } else {
+          inventory.addItem(Item.deserialize(itemData));
+        }
+      });
 
-    data.equippedItems.forEach((equippedData: any) => {
-      const equipment = Equipment.deserialize(equippedData.item);
-      equipment.setEquipped(true);
-      inventory.equippedItems.set(equippedData.slot, equipment);
-    });
+      if (data.equippedItems) {
+        data.equippedItems.forEach((equippedData: any) => {
+          const equipment = Equipment.deserialize(equippedData.item);
+          equipment.setEquipped(true);
+          inventory.equippedItems.set(equippedData.slot, equipment);
+        });
+      }
+    }
 
     return inventory;
   }

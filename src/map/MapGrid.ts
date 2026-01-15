@@ -123,6 +123,14 @@ export class MapGridManager {
     }
   }
 
+  clearAll(): void {
+    this.tiles = [];
+    this.rooms = [];
+    this.playerStart = { x: 0, y: 0 };
+    this.stairsDown = { x: 0, y: 0 };
+    this.initializeGrid();
+  }
+
   getExploredTiles(): Tile[] {
     const explored: Tile[] = [];
     for (let y = 0; y < this.height; y++) {

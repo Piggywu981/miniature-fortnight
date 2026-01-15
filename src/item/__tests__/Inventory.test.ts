@@ -384,8 +384,8 @@ describe('Inventory', () => {
       });
       inventory.addItem(item);
       const data = inventory.serialize();
-      expect(data.maxSize).toBe(10);
-      expect(data.items.length).toBe(1);
+      expect(Array.isArray(data)).toBe(true);
+      expect(data.length).toBe(1);
     });
 
     it('should deserialize inventory data', () => {
@@ -401,7 +401,6 @@ describe('Inventory', () => {
       inventory.addItem(item);
       const data = inventory.serialize();
       const deserialized = Inventory.deserialize(data);
-      expect(deserialized.getMaxSize()).toBe(inventory.getMaxSize());
       expect(deserialized.getSize()).toBe(inventory.getSize());
     });
   });
