@@ -37,6 +37,7 @@ export class Player extends Physics.Arcade.Sprite {
         // 冷却时间
         this.abilityCooldown = 0;
         this.lastShieldRegen = 0;
+        this.hurtCooldown = 0;  // 受伤冷却时间（防止连续受伤）
         
         // 角色特定计数器
         this.killCount = 0;
@@ -44,7 +45,8 @@ export class Player extends Physics.Arcade.Sprite {
         
         // 设置碰撞
         this.setCollideWorldBounds(true);
-        this.body.setCircle(12);
+        this.body.setSize(24, 24); // 设置碰撞体大小为24x24（精灵是32x32）
+        this.body.setOffset(4, 4); // 偏移4像素居中
         
         this.initializeAbilities();
     }
@@ -62,6 +64,7 @@ export class Player extends Physics.Arcade.Sprite {
         this.handleShooting(time);
         this.handleRegeneration(time);
         this.handleAbilityCooldown(delta);
+        this.handleHurtCooldown(delta);
         
         // 角色特定更新
         if (this.config.class === '傻子') {
@@ -173,9 +176,8 @@ export class Player extends Physics.Arcade.Sprite {
             bulletDamage *= 1.5;
         }
         
-        // 创建子弹
-        const bullet = this.scene.add.rectangle(this.x, this.y, 8, 8, 0xffff00);
-        this.scene.physics.add.existing(bullet);
+        // 创建子弹 - 使用 phaser sprite 确保有物理属性
+        const bullet = this.scene.physics.add.sprite(this.x, this.y, 'bullet');
         this.scene.projectiles.add(bullet);
         
         // 设置子弹速度和伤害
@@ -217,6 +219,12 @@ export class Player extends Physics.Arcade.Sprite {
         }
     }
 
+    handleHurtCooldown(delta) {
+        if (this.hurtCooldown > 0) {
+            this.hurtCooldown -= delta;
+        }
+    }
+
     useRightClickAbility(targetX, targetY) {
         if (this.abilityCooldown > 0) return;
         
@@ -255,7 +263,9 @@ export class Player extends Physics.Arcade.Sprite {
         
         // 暂时显示然后隐藏
         this.scene.time.delayedCall(100, () => {
-            hitbox.destroy();
+            if (hitbox && !hitbox.destroyed) {
+                hitbox.destroy();
+            }
         });
         
         // 检测击中敌人
@@ -296,8 +306,10 @@ export class Player extends Physics.Arcade.Sprite {
         
         // 短暂延迟后恢复
         this.scene.time.delayedCall(300, () => {
-            this.isInvincible = false;
-            this.setVelocity(0, 0);
+            if (this && !this.destroyed) {
+                this.isInvincible = false;
+                this.setVelocity(0, 0);
+            }
         });
         
         this.abilityCooldown = 1000;
@@ -312,7 +324,9 @@ export class Player extends Physics.Arcade.Sprite {
         clone.alpha = 0.5;
         
         this.scene.time.delayedCall(5000, () => {
-            clone.destroy();
+            if (clone && !clone.destroyed) {
+                clone.destroy();
+            }
         });
         
         this.abilityCooldown = 30000; // 30秒冷却
@@ -344,9 +358,11 @@ export class Player extends Physics.Arcade.Sprite {
         
         // 持续时间3秒
         this.scene.time.delayedCall(3000, () => {
-            this.isInvincible = false;
-            this.alpha = 1;
-            this.clearTint();
+            if (this && !this.destroyed) {
+                this.isInvincible = false;
+                this.alpha = 1;
+                this.clearTint();
+            }
         });
         
         this.abilityCooldown = 60000; // 60秒冷却
@@ -400,18 +416,21 @@ export class Player extends Physics.Arcade.Sprite {
     }
 
     takeDamage(amount) {
-        if (this.isInvincible) {
+        if (this.isInvincible || this.hurtCooldown > 0) {
             // 触发玉子的复仇（如果在受到伤害时）
-            if (this.config.class === '乐子人') {
+            if (this.config.class === '乐子人' && this.isInvincible) {
                 this.triggerRevenge();
             }
-            return 0; // 免疫伤害
+            return 0; // 免疫伤害或处于受伤冷却中
         }
         
         // 闪避检查
         if (this.config.class !== '疯子' && Math.random() < this.dodgeChance) {
             return 0; // 闪避成功
         }
+        
+        // 设置受伤冷却（1秒内不能再次受伤）
+        this.hurtCooldown = 1000;
         
         let actualDamage = amount;
         
@@ -480,10 +499,16 @@ export class Player extends Physics.Arcade.Sprite {
 
     die() {
         // 游戏结束
+        if (!this.scene) return;
+        
         this.scene.cameras.main.fadeOut(1000);
         this.scene.time.delayedCall(1000, () => {
-            this.destroy();
-            this.scene.scene.restart();
+            if (this && !this.destroyed) {
+                this.destroy();
+            }
+            if (this.scene && this.scene.scene) {
+                this.scene.scene.restart();
+            }
         });
     }
 }

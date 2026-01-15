@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Phaser纹理测试</title>
+</head>
+<body>
+    <div id="phaser-game"></div>
+    <script type="module">
+        console.log('Phaser 版本:', window.Phaser?.VERSION || '未加载');
+        
+        const config = {
+            type: Phaser.AUTO,
+            width: 800,
+            height: 600,
+            parent: 'phaser-game',
+            physics: {
+                default: 'arcade',
+                arcade: { gravity: { y: 0 } }
+            },
+            scene: {
+                preload: function() {
+                    console.log('预加载阶段...');
+                },
+                create: function() {
+                    console.log('创建阶段...');
+                    
+                    // 创建纹理
+                    const g = this.add.graphics();
+                    
+                    // 地面
+                    g.fillStyle(0x333333);
+                    g.fillRect(0, 0, 32, 32);
+                    g.generateTexture('ground-tile', 32, 32);
+                    
+                    // 墙壁
+                    g.fillStyle(0x666666);
+                    g.fillRect(0, 0, 32, 32);
+                    g.generateTexture('wall-tile', 32, 32);
+                    
+                    // 玩家
+                    g.clear();
+                    g.fillStyle(0x00ff00);
+                    g.fillCircle(16, 16, 12);
+                    g.generateTexture('player', 32, 32);
+                    
+                    // 子弹
+                    g.clear();
+                    g.fillStyle(0xffff00);
+                    g.fillCircle(4, 4, 4);
+                    g.generateTexture('bullet', 8, 8);
+                    
+                    g.destroy();
+                    
+                    // 使用纹理
+                    const wall = this.add.rectangle(400, 300, 32, 32, 0x666666);
+                    this.physics.add.existing(wall);
+                    wall.setImmovable(true);
+                    
+                    console.log('纹理创建成功！');
+                    this.add.text(100, 100, '纹理测试通过!', { color: '#fff' });
+                }
+            }
+        };
+        
+        const game = new Phaser.Game(config);
+    </script>
+</body>
+</html>

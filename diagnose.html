@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>诊断 - 修复纹理问题</title>
+</head>
+<body>
+    <h2>如果看到绿色方块，说明问题已修复</h2>
+    <div id="game"></div>
+    
+    <script type="module">
+        import Phaser from 'https://cdn.jsdelivr.net/npm/phaser@3.70.0/dist/phaser.esm.js';
+        
+        class TestScene extends Phaser.Scene {
+            constructor() {
+                super({ key: 'TestScene' });
+            }
+            
+            preload() {
+                // 创建程序化纹理
+                this.createTextures();
+            }
+            
+            createTextures() {
+                // 在 preload 阶段创建纹理
+                const graphics = this.make.graphics({}, false);
+                
+                // 地面纹理
+                graphics.fillStyle(0x3a3a3a);
+                graphics.fillRect(0, 0, 32, 32);
+                graphics.generateTexture('ground-tile', 32, 32);
+                
+                // 墙壁纹理
+                graphics.fillStyle(0x6a6a6a);
+                graphics.fillRect(0, 0, 32, 32);
+                graphics.generateTexture('wall-tile', 32, 32);
+                
+                // 玩家纹理
+                graphics.clear();
+                graphics.fillStyle(0x00ff00);
+                graphics.fillCircle(16, 16, 12);
+                graphics.generateTexture('player', 32, 32);
+                
+                // 敌人纹理
+                graphics.clear();
+                graphics.fillStyle(0xff00ff);
+                graphics.fillCircle(10, 10, 10);
+                graphics.generateTexture('enemy', 20, 20);
+                
+                graphics.destroy();
+            }
+            
+            create() {
+                this.add.text(10, 10, '✓ Phaser 加载成功', { color: '#0f0' });
+                
+                // 测试纹理
+                const player = this.add.sprite(400, 300, 'player');
+                this.add.text(400, 350, '玩家精灵', { color: '#fff' }).setOrigin(0.5);
+                
+                // 测试物理
+                this.physics.add.existing(player);
+                player.setInteractive();
+                this.input.on('pointermove', (pointer) => {
+                    player.x = pointer.x;
+                    player.y = pointer.y;
+                });
+            }
+        }
+        
+        const config = {
+            type: Phaser.AUTO,
+            width: 800,
+            height: 600,
+            parent: 'game',
+            physics: {
+                default: 'arcade',
+                arcade: { debug: false }
+            },
+            scene: TestScene
+        };
+        
+        const game = new Phaser.Game(config);
+    </script>
+</body>
+</html>

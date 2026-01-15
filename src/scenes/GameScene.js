@@ -17,11 +17,13 @@ export class GameScene extends Scene {
     }
 
     preload() {
-        // 创建简单的占位图形
-        this.createPlaceholderGraphics();
+        // 预加载阶段不需要做什么
     }
 
     create() {
+        // 在 create 阶段开始时创建所有纹理
+        this.createPlaceholderGraphics();
+        
         // 初始化输入
         this.initializeInput();
         
@@ -61,13 +63,13 @@ export class GameScene extends Scene {
         this.cursors = this.input.keyboard.createCursorKeys();
         this.wasd = this.input.keyboard.addKeys('W,S,A,D');
         
-        // 鼠标输入
+        // 鼠标输入 - 使用 worldX/worldY 获取世界坐标
         this.input.on('pointerdown', (pointer) => {
             if (this.player && this.player.active) {
                 if (pointer.rightButtonDown()) {
-                    this.player.useRightClickAbility(pointer.x, pointer.y);
+                    this.player.useRightClickAbility(pointer.worldX, pointer.worldY);
                 } else {
-                    this.player.startShooting(pointer.x, pointer.y);
+                    this.player.startShooting(pointer.worldX, pointer.worldY);
                 }
             }
         });
@@ -80,29 +82,43 @@ export class GameScene extends Scene {
     }
 
     createMap() {
-        // 创建简单的tilemap
-        this.map = this.make.tilemap({ 
-            tileWidth: 32, 
-            tileHeight: 32,
-            width: 50,
-            height: 50
-        });
+        // 创建简单的游戏世界边界
+        const wallThickness = 20;
+        const worldWidth = 1200;
+        const worldHeight = 900;
         
-        const tiles = this.map.addTilesetImage('tiles', null, 32, 32);
-        this.groundLayer = this.map.createBlankLayer('ground', tiles);
-        this.wallsLayer = this.map.createBlankLayer('walls', tiles);
+        // 创建地面背景
+        const ground = this.add.rectangle(
+            worldWidth / 2, 
+            worldHeight / 2, 
+            worldWidth, 
+            worldHeight, 
+            0x333333
+        );
+        ground.setDepth(-1); // 设置在最底层
         
-        // 填充地面
-        this.groundLayer.fill(0);
+        // 创建墙壁组
+        this.walls = this.physics.add.staticGroup();
         
-        // 创建墙壁边界
-        this.wallsLayer.fill(1, 0, 0, 50, 1);
-        this.wallsLayer.fill(1, 0, 49, 50, 1);
-        this.wallsLayer.fill(1, 0, 0, 1, 50);
-        this.wallsLayer.fill(1, 49, 0, 1, 50);
+        // 上墙
+        this.walls.create(worldWidth / 2, wallThickness / 2, 'wall-tile')
+            .setDisplaySize(worldWidth, wallThickness).refreshBody();
         
-        // 设置碰撞
-        this.wallsLayer.setCollision([1]);
+        // 下墙
+        this.walls.create(worldWidth / 2, worldHeight - wallThickness / 2, 'wall-tile')
+            .setDisplaySize(worldWidth, wallThickness).refreshBody();
+        
+        // 左墙
+        this.walls.create(wallThickness / 2, worldHeight / 2, 'wall-tile')
+            .setDisplaySize(wallThickness, worldHeight).refreshBody();
+        
+        // 右墙
+        this.walls.create(worldWidth - wallThickness / 2, worldHeight / 2, 'wall-tile')
+            .setDisplaySize(wallThickness, worldHeight).refreshBody();
+        
+        // 设置世界边界
+        this.physics.world.setBounds(0, 0, worldWidth, worldHeight);
+        this.cameras.main.setBounds(0, 0, worldWidth, worldHeight);
     }
 
     createPlayer(characterId) {
@@ -181,12 +197,15 @@ export class GameScene extends Scene {
             const x = Phaser.Math.Between(100, this.game.config.width - 100);
             const y = Phaser.Math.Between(100, this.game.config.height - 100);
             
-            const enemy = this.add.rectangle(x, y, 20, 20, 0xff00ff);
+            const enemy = this.physics.add.sprite(x, y, 'enemy');
             
             enemy.health = 3;
             enemy.speed = 50;
             
-            this.physics.add.existing(enemy);
+            // 设置物理属性
+            enemy.setCircle(10); // 设置圆形碰撞体
+            enemy.setCollideWorldBounds(true);
+            
             this.enemies.add(enemy);
         }
     }
@@ -195,10 +214,26 @@ export class GameScene extends Scene {
         if (!this.player || !this.player.active) return;
         
         // 玩家与墙壁的碰撞
-        this.physics.collide(this.player, this.wallsLayer);
+        this.physics.collide(this.player, this.walls);
         
         // 敌人与墙壁的碰撞
-        this.physics.collide(this.enemies, this.wallsLayer);
+        this.physics.collide(this.enemies, this.walls);
+        
+        // 玩家与敌人的碰撞（受到伤害）
+        this.physics.overlap(this.player, this.enemies, (player, enemy) => {
+            player.takeDamage(1); // 每次碰撞受1点伤害
+            
+            // 击退敌人
+            const angle = Phaser.Math.Angle.Between(enemy.x, enemy.y, player.x, player.y);
+            enemy.x += Math.cos(angle) * 20;
+            enemy.y += Math.sin(angle) * 20;
+        });
+        
+        // 子弹与敌人的碰撞
+        this.physics.overlap(this.projectiles, this.enemies, (bullet, enemy) => {
+            bullet.destroy();
+            this.handleEnemyDeath(enemy);
+        });
         
         // 敌人跟随玩家
         this.enemies.children.entries.forEach(enemy => {
@@ -231,30 +266,49 @@ export class GameScene extends Scene {
     }
 
     createPlaceholderGraphics() {
-        // 创建临时图形资源
-        const graphics = this.add.graphics();
+        // 创建临时图形资源 - 使用 this.make.graphics() 更安全
+        const graphics = this.make.graphics({ x: 0, y: 0 }, false);
         
-        // 地面瓷砖
-        graphics.fillStyle(0x333333);
+        // 地面纹理（实际游戏中使用）
+        graphics.fillStyle(0x3a3a3a);
         graphics.fillRect(0, 0, 32, 32);
         graphics.generateTexture('ground-tile', 32, 32);
         
-        // 墙壁瓷砖
-        graphics.fillStyle(0x666666);
+        // 墙壁纹理
+        graphics.fillStyle(0x6a6a6a);
         graphics.fillRect(0, 0, 32, 32);
         graphics.generateTexture('wall-tile', 32, 32);
         
-        // 玩家图形
+        // 玩家纹理
         graphics.clear();
         graphics.fillStyle(0x00ff00);
         graphics.fillCircle(16, 16, 12);
         graphics.generateTexture('player', 32, 32);
         
-        // 子弹图形
+        // 敌�纹理
+        graphics.clear();
+        graphics.fillStyle(0xff00ff);
+        graphics.fillCircle(10, 10, 10);
+        graphics.generateTexture('enemy', 20, 20);
+        
+        // 子弹纹理
         graphics.clear();
         graphics.fillStyle(0xffff00);
         graphics.fillCircle(4, 4, 4);
         graphics.generateTexture('bullet', 8, 8);
+        
+        // 道具纹理（使用正多边形代替星形）
+        graphics.clear();
+        graphics.fillStyle(0x00ff00);
+        // 手动绘制菱形路径
+        graphics.beginPath();
+        graphics.moveTo(8, 0);   // 上
+        graphics.lineTo(16, 8);  // 右
+        graphics.lineTo(8, 16);  // 下
+        graphics.lineTo(0, 8);   // 左
+        graphics.closePath();
+        graphics.fillPath();
+        graphics.generateTexture('item', 16, 16);
         
         graphics.destroy();
     }
