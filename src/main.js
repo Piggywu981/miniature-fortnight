@@ -1,4 +1,6 @@
+import { MenuScene } from './scenes/MenuScene.js';
 import { GameScene } from './scenes/GameScene.js';
+import { GameOverScene } from './scenes/GameOverScene.js';
 
 // Phaser游戏配置
 const config = {
@@ -18,7 +20,7 @@ const config = {
             debug: false
         }
     },
-    scene: GameScene
+    scene: [MenuScene, GameScene, GameOverScene]
 };
 
 // 创建游戏实例
@@ -33,4 +35,5 @@ const game = new Phaser.Game(config);
 // 6. 召唤物系统（安娜专用）
 // 7. 随机升级系统
 // 8. 地牢探索和敌人战斗
-// 9. 平��退道具和升级机制
+// 9. 开始/结束界面
+// 10. 角色选择与评级系统

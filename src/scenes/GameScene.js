@@ -20,7 +20,10 @@ export class GameScene extends Scene {
         // 预加载阶段不需要做什么
     }
 
-    create() {
+    create(data) {
+        // 获取从菜单传递过来的角色ID，默认为伊娜
+        const characterId = data && data.characterId ? data.characterId : 'INA';
+        
         // 在 create 阶段开始时创建所有纹理
         this.createPlaceholderGraphics();
         
@@ -30,8 +33,8 @@ export class GameScene extends Scene {
         // 创建地图
         this.createMap();
         
-        // 创建玩家（默认使用伊娜）
-        this.createPlayer('INA');
+        // 创建玩家（使用选中的角色）
+        this.createPlayer(characterId);
         
         // 创建游戏对象组
         this.createGroups();
@@ -123,6 +126,10 @@ export class GameScene extends Scene {
 
     createPlayer(characterId) {
         const config = CharacterConfig[characterId];
+        
+        // 在config中添加characterId
+        config.characterId = characterId;
+        
         const startX = this.game.config.width / 2;
         const startY = this.game.config.height / 2;
         

@@ -498,16 +498,23 @@ export class Player extends Physics.Arcade.Sprite {
     }
 
     die() {
-        // 游戏结束
+        // 游戏结束 - 跳转到游戏结束界面
         if (!this.scene) return;
         
         this.scene.cameras.main.fadeOut(1000);
         this.scene.time.delayedCall(1000, () => {
-            if (this && !this.destroyed) {
-                this.destroy();
-            }
+            // 跳转到游戏结束场景，传递游戏数据
             if (this.scene && this.scene.scene) {
-                this.scene.scene.restart();
+                const gameData = {
+                    characterName: this.config.name,
+                    characterClass: this.config.class,
+                    characterId: this.config.characterId || 'INA',
+                    killCount: this.killCount,
+                    gameTime: this.scene.gameTime,
+                    reason: '生命值耗尽'
+                };
+                
+                this.scene.scene.start('GameOverScene', gameData);
             }
         });
     }
