@@ -1,5 +1,8 @@
 import { Physics } from 'phaser';
 import { ElementTypes } from './CharacterConfig.js';
+import { AbilitySystem } from '../systems/AbilitySystem.js';
+import { SpecialAbilitySystem } from '../systems/SpecialAbilitySystem.js';
+import { KillCountManager } from '../systems/KillCountManager.js';;
 
 export class Player extends Physics.Arcade.Sprite {
     constructor(scene, x, y, config) {
@@ -43,6 +46,16 @@ export class Player extends Physics.Arcade.Sprite {
         this.killCount = 0;
         this.shieldSlotTimer = 0; // 用于傻子
         
+        // 初始化技能系统
+        this.abilitySystem = new AbilitySystem(scene, this);
+        this.specialAbilitySystem = new SpecialAbilitySystem(scene, this);
+        this.killCountManager = new KillCountManager(scene, this, this.specialAbilitySystem);
+        
+        // 设置击杀事件监听
+        this.killCountManager.subscribeToKill((killCount, streak) => {
+            this.killCount = killCount; // 同步击杀计数
+        });
+        
         // 设置碰撞
         this.setCollideWorldBounds(true);
         this.body.setSize(24, 24); // 设置碰撞体大小为24x24（精灵是32x32）
@@ -65,6 +78,11 @@ export class Player extends Physics.Arcade.Sprite {
         this.handleRegeneration(time);
         this.handleAbilityCooldown(delta);
         this.handleHurtCooldown(delta);
+        
+        // 更新技能系统
+        if (this.abilitySystem) {
+            this.abilitySystem.update(delta);
+        }
         
         // 角色特定更新
         if (this.config.class === '傻子') {
@@ -228,191 +246,10 @@ export class Player extends Physics.Arcade.Sprite {
     useRightClickAbility(targetX, targetY) {
         if (this.abilityCooldown > 0) return;
         
-        switch (this.config.class) {
-            case '干活的': // 伊娜 - 近战攻击
-                this.meleeAttack(targetX, targetY);
-                break;
-            case '疯子': // 米什卡 - 冲撞
-                this.chargeAttack(targetX, targetY);
-                break;
-            case '谨慎军师': // 安娜 - 召唤克隆
-                this.summonClone();
-                break;
-            case '傻子': // 米兰 - 无敌
-                this.activateInvincibility();
-                break;
-            case '乐子人': // 玉子 - 连锁榴弹
-                this.chainGrenadeAttack();
-                break;
+        // 使用新的技能系统
+        if (this.abilitySystem) {
+            this.abilitySystem.useAbility(targetX, targetY);
         }
-    }
-
-    meleeAttack(targetX, targetY) {
-        // 近战攻击逻辑
-        const angle = Phaser.Math.Angle.Between(this.x, this.y, targetX, targetY);
-        const swingDistance = 30;
-        
-        const damage = this.damage * 0.1; // 10%子弹伤害
-        
-        // 创建近战范围检测
-        const hitbox = this.scene.add.rectangle(
-            this.x + Math.cos(angle) * swingDistance,
-            this.y + Math.sin(angle) * swingDistance,
-            20, 20, 0x00ffff
-        );
-        
-        // 暂时显示然后隐藏
-        this.scene.time.delayedCall(100, () => {
-            if (hitbox && !hitbox.destroyed) {
-                hitbox.destroy();
-            }
-        });
-        
-        // 检测击中敌人
-        const enemies = this.scene.enemies.children.entries;
-        enemies.forEach(enemy => {
-            if (Phaser.Math.Distance.Between(hitbox.x, hitbox.y, enemy.x, enemy.y) < 20) {
-                this.dealDamageToEnemy(enemy, damage);
-            }
-        });
-        
-        this.abilityCooldown = 500; // 短暂冷却
-    }
-
-    chargeAttack(targetX, targetY) {
-        // 冲撞攻击
-        const angle = Phaser.Math.Angle.Between(this.x, this.y, targetX, targetY);
-        const chargeDistance = 100;
-        const chargeSpeed = 500;
-        
-        this.isInvincible = true;
-        
-        // 设置冲��速度
-        this.setVelocity(
-            Math.cos(angle) * chargeSpeed,
-            Math.sin(angle) * chargeSpeed
-        );
-        
-        // 冲撞伤害
-        const damage = this.damage * 2.0; // 200%子弹伤害
-        
-        // 检测冲撞路径上的敌人
-        const enemies = this.scene.enemies.children.entries;
-        enemies.forEach(enemy => {
-            if (Phaser.Math.Distance.Between(this.x, this.y, enemy.x, enemy.y) < chargeDistance) {
-                this.dealDamageToEnemy(enemy, damage);
-            }
-        });
-        
-        // 短暂延迟后恢复
-        this.scene.time.delayedCall(300, () => {
-            if (this && !this.destroyed) {
-                this.isInvincible = false;
-                this.setVelocity(0, 0);
-            }
-        });
-        
-        this.abilityCooldown = 1000;
-    }
-
-    summonClone() {
-        // 只在安娜（谨慎军师）时生效
-        if (this.config.class !== '谨慎军师') return;
-        
-        // 在原地召唤一个克隆（简化实现）
-        const clone = this.scene.add.circle(this.x, this.y, 12, 0x00ffff);
-        clone.alpha = 0.5;
-        
-        this.scene.time.delayedCall(5000, () => {
-            if (clone && !clone.destroyed) {
-                clone.destroy();
-            }
-        });
-        
-        this.abilityCooldown = 30000; // 30秒冷却
-    }
-
-    activateInvincibility() {
-        // 只在 Milan（傻子）时生效
-        if (this.config.class !== '傻子') return;
-        
-        this.isInvincible = true;
-        
-        // 视觉反馈
-        this.alpha = 0.7;
-        this.setTint(0x00ffff);
-        
-        // 弹开周围的敌人
-        const enemies = this.scene.enemies.children.entries;
-        enemies.forEach(enemy => {
-            const distance = Phaser.Math.Distance.Between(this.x, this.y, enemy.x, enemy.y);
-            if (distance < 80) {
-                const angle = Phaser.Math.Angle.Between(this.x, this.y, enemy.x, enemy.y);
-                const pushForce = 200;
-                enemy.body.setVelocity(
-                    Math.cos(angle) * pushForce,
-                    Math.sin(angle) * pushForce
-                );
-            }
-        });
-        
-        // 持续时间3秒
-        this.scene.time.delayedCall(3000, () => {
-            if (this && !this.destroyed) {
-                this.isInvincible = false;
-                this.alpha = 1;
-                this.clearTint();
-            }
-        });
-        
-        this.abilityCooldown = 60000; // 60秒冷却
-    }
-
-    chainGrenadeAttack() {
-        // 只在玉子（乐子人）时生效
-        if (this.config.class !== '乐子人') return;
-        
-        const enemies = this.scene.enemies.children.entries;
-        if (enemies.length === 0) return;
-        
-        // 找到最近的敌人
-        let closestEnemy = null;
-        let closestDistance = Infinity;
-        
-        enemies.forEach(enemy => {
-            const distance = Phaser.Math.Distance.Between(this.x, this.y, enemy.x, enemy.y);
-            if (distance < closestDistance) {
-                closestDistance = distance;
-                closestEnemy = enemy;
-            }
-        });
-        
-        if (closestEnemy) {
-            // 杀死最近的敌人
-            this.dealDamageToEnemy(closestEnemy, Infinity);
-            
-            // 发射6枚特殊榴弹
-            for (let i = 0; i < 6; i++) {
-                const grenade = this.scene.add.circle(
-                    closestEnemy.x,
-                    closestEnemy.y,
-                    8,
-                    0xff8800
-                );
-                this.scene.physics.add.existing(grenade);
-                this.scene.projectiles.add(grenade);
-                
-                const angle = (Math.PI * 2 / 6) * i;
-                grenade.setVelocity(
-                    Math.cos(angle) * 300,
-                    Math.sin(angle) * 300
-                );
-                grenade.damage = this.damage;
-                grenade.isSpecial = true;
-            }
-        }
-        
-        this.abilityCooldown = 20000; // 20秒冷却
     }
 
     takeDamage(amount) {

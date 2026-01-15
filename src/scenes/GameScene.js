@@ -321,43 +321,17 @@ export class GameScene extends Scene {
     }
 
     handleEnemyDeath(enemy) {
-        this.killCount++;
         enemy.destroy();
         
-        // 检查特殊条件
-        if (this.killCount % 1000 === 0) {
-            // 伊娜的治疗道具掉落
-            if (this.player.config.class === '干活的') {
-                this.dropHealthItem(enemy.x, enemy.y);
-            }
-        }
-        
-        // 玉子的随机升级
-        if (this.player.config.class === '乐子人' && this.killCount % 1000 === 0) {
-            // 触发随机升级
-            this.triggerRandomUpgrade();
-        }
-        
-        // 玉子的受伤复仇
-        if (this.player.config.class === '乐子人') {
-            // 受伤后消灭最近的10个敌人（代码中在其他地方处理）
+        // 使用击杀计数管理器处理击杀
+        if (this.player.killCountManager) {
+            this.player.killCountManager.incrementKillCount();
+            this.killCount = this.player.killCountManager.killCount;
+        } else {
+            // 后备方案
+            this.killCount++;
         }
     }
 
-    dropHealthItem(x, y) {
-        const item = this.add.rectangle(x, y, 15, 15, 0x00ff00);
-        this.physics.add.existing(item);
-        this.items.add(item);
-        
-        // 拾取检测
-        this.physics.add.overlap(this.player, item, () => {
-            item.destroy();
-            this.player.heal(2);
-        });
-    }
 
-    triggerRandomUpgrade() {
-        // 实现随机升级逻辑
-        console.log('随机升级触发！');
-    }
 }
