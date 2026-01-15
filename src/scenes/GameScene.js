@@ -1,6 +1,7 @@
 import { Scene } from 'phaser';
 import { CharacterConfig } from '../characters/CharacterConfig.js';
 import { Player } from '../characters/Player.js';
+import { EnemyManager } from '../enemies/EnemyManager.js';
 
 export class GameScene extends Scene {
     constructor() {
@@ -39,11 +40,11 @@ export class GameScene extends Scene {
         // 创建游戏对象组
         this.createGroups();
         
+        // 创建敌人管理器
+        this.enemyManager = new EnemyManager(this);
+        
         // 创建UI
         this.createUI();
-        
-        // 生成初始敌人
-        this.spawnEnemies(5);
     }
 
     update(time, delta) {
@@ -52,6 +53,11 @@ export class GameScene extends Scene {
         // 更新玩家
         if (this.player && this.player.active) {
             this.player.update(time, delta);
+        }
+        
+        // 更新敌人管理器
+        if (this.enemyManager) {
+            this.enemyManager.update(time, delta);
         }
         
         // 更新敌人和碰撞检测
@@ -199,24 +205,6 @@ export class GameScene extends Scene {
         return { container, bar, text };
     }
 
-    spawnEnemies(count) {
-        for (let i = 0; i < count; i++) {
-            const x = Phaser.Math.Between(100, this.game.config.width - 100);
-            const y = Phaser.Math.Between(100, this.game.config.height - 100);
-            
-            const enemy = this.physics.add.sprite(x, y, 'enemy');
-            
-            enemy.health = 3;
-            enemy.speed = 50;
-            
-            // 设置物理属性
-            enemy.setCircle(10); // 设置圆形碰撞体
-            enemy.setCollideWorldBounds(true);
-            
-            this.enemies.add(enemy);
-        }
-    }
-
     updateCollisions() {
         if (!this.player || !this.player.active) return;
         
@@ -228,33 +216,37 @@ export class GameScene extends Scene {
         
         // 玩家与敌人的碰撞（受到伤害）
         this.physics.overlap(this.player, this.enemies, (player, enemy) => {
-            player.takeDamage(1); // 每次碰撞受1点伤害
+            player.takeDamage(enemy.damage || 1); // 使用敌人的伤害值
             
             // 击退敌人
             const angle = Phaser.Math.Angle.Between(enemy.x, enemy.y, player.x, player.y);
-            enemy.x += Math.cos(angle) * 20;
-            enemy.y += Math.sin(angle) * 20;
+            enemy.body.setVelocity(Math.cos(angle) * 100, Math.sin(angle) * 100);
         });
         
         // 子弹与敌人的碰撞
         this.physics.overlap(this.projectiles, this.enemies, (bullet, enemy) => {
             bullet.destroy();
-            this.handleEnemyDeath(enemy);
+            enemy.takeDamage(bullet.damage || this.player.damage);
         });
         
-        // 敌人跟随玩家
-        this.enemies.children.entries.forEach(enemy => {
-            if (enemy.active) {
-                const angle = Phaser.Math.Angle.Between(
-                    enemy.x, enemy.y,
-                    this.player.x, this.player.y
-                );
-                
-                enemy.body.setVelocity(
-                    Math.cos(angle) * enemy.speed,
-                    Math.sin(angle) * enemy.speed
-                );
-            }
+        // 玩家子弹与敌人子弹的碰撞
+        this.physics.overlap(this.projectiles, this.enemyProjectiles, (playerBullet, enemyBullet) => {
+            playerBullet.destroy();
+            enemyBullet.destroy();
+            
+            // TODO: 这里可以添加碰撞特效
+            const effect = this.add.circle(playerBullet.x, playerBullet.y, 8, 0xffffff, 0.5);
+            this.tweens.add({
+                targets: effect,
+                scale: 2,
+                alpha: 0,
+                duration: 200,
+                onComplete: () => {
+                    if (effect && !effect.destroyed) {
+                        effect.destroy();
+                    }
+                }
+            });
         });
     }
 
@@ -292,7 +284,55 @@ export class GameScene extends Scene {
         graphics.fillCircle(16, 16, 12);
         graphics.generateTexture('player', 32, 32);
         
-        // 敌�纹理
+        // 敌人纹理 - 基础敌人
+        graphics.clear();
+        graphics.fillStyle(0xff00ff);
+        graphics.fillCircle(10, 10, 10);
+        graphics.generateTexture('enemy-basic', 20, 20);
+        
+        // 快速敌人
+        graphics.clear();
+        graphics.fillStyle(0x00ffff);
+        graphics.fillCircle(8, 8, 8);
+        graphics.generateTexture('enemy-rush', 16, 16);
+        
+        // 坦克敌人
+        graphics.clear();
+        graphics.fillStyle(0xff8800);
+        graphics.fillCircle(14, 14, 14);
+        graphics.generateTexture('enemy-tank', 28, 28);
+        
+        // 分裂敌人
+        graphics.clear();
+        graphics.fillStyle(0x00ff00);
+        graphics.fillCircle(10, 10, 10);
+        graphics.lineStyle(2, 0xffffff);
+        graphics.strokeCircle(10, 10, 10);
+        graphics.generateTexture('enemy-split', 20, 20);
+        
+        // 小敌人
+        graphics.clear();
+        graphics.fillStyle(0xaaff00);
+        graphics.fillCircle(6, 6, 6);
+        graphics.generateTexture('enemy-mini', 12, 12);
+        
+        // 射击敌人
+        graphics.clear();
+        graphics.fillStyle(0xff0088);
+        graphics.fillCircle(10, 10, 10);
+        graphics.fillStyle(0x000000);
+        graphics.fillRect(7, 9, 6, 2);
+        graphics.generateTexture('enemy-shooter', 20, 20);
+        
+        // 爆炸敌人
+        graphics.clear();
+        graphics.fillStyle(0xff0000);
+        graphics.fillCircle(10, 10, 10);
+        graphics.lineStyle(2, 0xff0000);
+        graphics.strokeCircle(10, 10, 12);
+        graphics.generateTexture('enemy-exploder', 20, 20);
+        
+        // 敌人（默认）
         graphics.clear();
         graphics.fillStyle(0xff00ff);
         graphics.fillCircle(10, 10, 10);
@@ -320,18 +360,75 @@ export class GameScene extends Scene {
         graphics.destroy();
     }
 
-    handleEnemyDeath(enemy) {
-        enemy.destroy();
+    handleEnemyDeath(enemy, awardScore = true) {
+        // 只有在敌人仍有活跃状态时处理
+        if (!enemy || enemy.health > 0) return;
         
-        // 使用击杀计数管理器处理击杀
-        if (this.player.killCountManager) {
+        // 获取敌人得分和颜色
+        const score = enemy.score || 10;
+        const color = enemy.color || 0xff00ff;
+        
+        // 处理击杀
+        let killCountWasIncremented = false;
+        if (this.player && this.player.killCountManager) {
             this.player.killCountManager.incrementKillCount();
             this.killCount = this.player.killCountManager.killCount;
+            killCountWasIncremented = true;
         } else {
             // 后备方案
             this.killCount++;
+            killCountWasIncremented = true;
         }
+        
+        // 更新敌人管理器统计（如果存在）
+        if (this.enemyManager) {
+            this.enemyManager.totalEnemiesKilled++;
+        }
+        
+        // 销毁敌人
+        enemy.destroy();
+        
+        // TODO: 添加击杀特效和音效
+        this.createKillEffect(enemy.x, enemy.y, score, color);
     }
 
-
+    /**
+     * 创建击杀特效
+     */
+    createKillEffect(x, y, score, color = 0xff00ff) {
+        // 得分文字
+        const text = this.add.text(x, y, `+${score}`, {
+            fontSize: '16px',
+            fill: '#ffff00',
+            stroke: '#000',
+            strokeThickness: 2
+        });
+        text.setOrigin(0.5);
+        
+        this.tweens.add({
+            targets: text,
+            y: y - 30,
+            alpha: 0,
+            duration: 800,
+            onComplete: () => {
+                if (text && !text.destroyed) {
+                    text.destroy();
+                }
+            }
+        });
+        
+        // 爆炸效果
+        const effect = this.add.circle(x, y, 10, color, 0.5);
+        this.tweens.add({
+            targets: effect,
+            scale: 2,
+            alpha: 0,
+            duration: 300,
+            onComplete: () => {
+                if (effect && !effect.destroyed) {
+                    effect.destroy();
+                }
+            }
+        });
+    }
 }
