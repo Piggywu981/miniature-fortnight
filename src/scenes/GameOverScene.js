@@ -282,14 +282,18 @@ export class GameOverScene extends Scene {
     }
 
     restartGame() {
-        // 重新使用相同的角色开始新游戏
+        if (this.audio) {
+            this.audio.stopBGM();
+        }
         this.scene.start('GameScene', {
             characterId: this.finalStats.characterId || 'INA'
         });
     }
 
     backToMenu() {
-        // 返回主菜单
+        if (this.audio) {
+            this.audio.stopBGM();
+        }
         this.scene.start('MenuScene');
     }
 }

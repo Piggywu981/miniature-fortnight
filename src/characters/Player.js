@@ -337,6 +337,10 @@ export class Player extends Physics.Arcade.Sprite {
     die() {
         // 游戏结束 - 跳转到游戏结束界面
         if (!this.scene) return;
+
+        if (this.scene.audio) {
+            this.scene.audio.stopBGM();
+        }
         
         this.scene.cameras.main.fadeOut(1000);
         this.scene.time.delayedCall(1000, () => {
